@@ -1,0 +1,18 @@
+﻿@page "/side2"
+@using Microsoft.AspNetCore.Authorization;
+@* @attribute [Authorize(Roles = "Admin")] *@
+
+<h3>Page 2</h3>
+
+<AuthorizeView Roles="Admin">
+    <Authorized>
+        <div>Adgang tilladt fordi du er admin.</div>
+    </Authorized>
+    <NotAuthorized>
+        <div>Adgang nægtet, du er IKKE admin.</div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+}
