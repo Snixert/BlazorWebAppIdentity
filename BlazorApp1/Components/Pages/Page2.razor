@@ -1,5 +1,6 @@
 ﻿@page "/side2"
 @using Microsoft.AspNetCore.Authorization;
+@using System.Runtime.InteropServices
 @* @attribute [Authorize(Roles = "Admin")] *@
 
 <h3>Page 2</h3>
@@ -14,5 +15,43 @@
 </AuthorizeView>
 
 @code {
+    protected override async Task OnInitializedAsync()
+    {
+        string operatingSystem = Environment.OSVersion.Platform.ToString();
 
+        // Define the folder path
+        string folderPath = "wwwroot";
+
+        // Set the folder path based on the operating system
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // Windows
+            folderPath = Directory.GetCurrentDirectory() + @"\" + folderPath;
+        }
+        else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            // Linux
+            folderPath = Directory.GetCurrentDirectory() + @"/" + folderPath;
+        }
+        else
+        {
+            // Handle other operating systems as needed
+            Console.WriteLine("Unsupported operating system");
+            return;
+        }
+
+        // Ensure the folder exists
+        Directory.CreateDirectory(folderPath);
+
+        // Define the file name
+        string fileName = Path.Combine(folderPath, "output.txt");
+
+        // Define the content for the text file
+        string fileContent = $"This file was created on a {operatingSystem} system in a specific folder.";
+
+        // Write content to the text file
+        File.WriteAllText(fileName, fileContent);
+
+        Console.WriteLine($"File '{fileName}' created successfully.");
+    }
 }
