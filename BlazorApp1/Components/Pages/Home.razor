@@ -1,25 +1,91 @@
-﻿@using Microsoft.AspNetCore.Identity;
+﻿@using BlazorApp1.Codes
+@using BlazorApp1.Models
+@using Microsoft.AspNetCore.DataProtection
+@using Microsoft.AspNetCore.Identity;
+@using Microsoft.EntityFrameworkCore
 @inject IServiceProvider serviceProvider;
+@inject IDataProtectionProvider protector;
 @inject UserManager<BlazorApp1.Data.ApplicationUser> userManager;
+@inject AuthenticationStateProvider _authenticationStateProvider;
+@inject TodoContext todoContext;
 
 @page "/"
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
-
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
-<br/>
-<a href="/side2">go to page 2</a>
-<br />
-<a href="/side3">go to page 3</a>
-<br />
-<a href="/side4">go to page 4</a>
+@if (IsAuthenticated)
+{
+    <div><h3>@UserName</h3></div>
+    @if (Cpr.CprNumber is null)
+    {
+        <label>Indtast dit CPR-Nummer:</label>
+        <br />
+        <input @bind="cprInput" />
+        if (InvalidCpr)
+        {
+            <label style="color:red;font:bold;background-color:black;">FORKERT CPR NUMMER INDTASTET</label>
+        }
+        <br />
+        <button @onclick="sendCPR">Submit</button>
+    }
+    else
+    {
+        <label style="margin-bottom:20px">Dit CPR-Nummer: @Cpr.CprNumber</label>
+        <br />
+        <label>Indtast todo:</label>
+        <br />
+        <input @bind="TodoInput" />
+        <br />
+        <button @onclick="AddToDoListItem">Submit</button>
+        <br />
+        <br />
+        if (TodoList.Count > 0)
+        {
+            <div style="width:500px">
+                <table style="width: 100%">
+                    <thead>
+                        <tr><b>User</b></tr>
+                        <tr><b>Task</b></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in TodoList)
+                        {
+                            <tr>
+                                <td>@item.User</td>
+                                <td>@item.Name</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+else
+{
+    <div><b>Du er ikke logget ind.</b></div>
+}
 
 @code {
+    public bool IsAuthenticated { get; set; }
+    public bool InvalidCpr { get; set; } = false;
+    public string UserName { get; set; } = string.Empty;
+    public string cprInput { get; set; } = string.Empty;
+    public string TodoInput { get; set; } = string.Empty;
+    public Cpr Cpr { get; set; } = new Cpr();
+    public List<TodoList> TodoList { get; set; } = new List<TodoList>();
+
     protected async override Task OnInitializedAsync()
     {
         //await CreateUserRoles("duck_wild@hotmail.com","Admin");
+
+        var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        IsAuthenticated = user.Identity.IsAuthenticated;
+        if (IsAuthenticated)
+        {
+            UserName = user.Identity.Name!;
+        }
     }
 
     public async Task CreateUserRoles(string user, string role)
@@ -34,5 +100,75 @@ Welcome to your new app.
         BlazorApp1.Data.ApplicationUser identityUser = await userManager.FindByEmailAsync(user);
         await userManager.AddToRoleAsync(identityUser, role);
 
+    }
+
+    public async Task sendCPR()
+    {
+        //Hash CPR input
+        string hashedCpr = Codes.HashingExamples.BCryptHashing(cprInput);
+
+        //Check if existing record for user is in DB
+        var existingCpr = await todoContext.Cprs.FirstOrDefaultAsync(x => x.User == UserName);
+
+        //If no records then create a new one
+        if (existingCpr is null)
+        {
+            Cpr.User = UserName;
+            Cpr.CprNumber = hashedCpr;
+
+            todoContext.Cprs.Add(Cpr);
+            await todoContext.SaveChangesAsync();
+        }
+        //Verify that the input CPR matches the hashed CPR in DB
+        else if (Codes.HashingExamples.BCryptVerifyHashing(cprInput, existingCpr.CprNumber))
+        {
+            Cpr.CprNumber = existingCpr.CprNumber;
+            await LoadTodoList();
+        }
+        //If record exists, but the wrong CPR Number was given
+        else
+        {
+            InvalidCpr = true;
+        }
+    }
+
+    public async Task LoadTodoList()
+    {
+        EncryptionHandler handler = new EncryptionHandler(protector);
+        
+        //Clear display list to prevent duplicates
+        TodoList.Clear();
+        var tt = await todoContext.TodoLists.Where(x => x.User == UserName).ToListAsync();
+        foreach (var item in tt)
+        {
+            // Create separate objects so Decrypt doesn't get saved to the database when SaveChangesAsync is hit when adding todo's
+
+            // Note to self; Figure out how to deep clone list of objects in C# to avoid this.
+            TodoList tempItem = new TodoList()
+            {
+                Name = item.Name,
+                User = item.User
+            };
+            tempItem.Name = handler.Decrypt(tempItem.Name);
+            TodoList.Add(tempItem);
+        }
+    }
+
+    public async Task AddToDoListItem()
+    {
+        EncryptionHandler handler = new EncryptionHandler(protector);
+        if (TodoInput == string.Empty)
+        {
+            return;
+        }
+
+        TodoList todoItem = new TodoList();
+        todoItem.User = UserName;
+
+        todoItem.Name = handler.Encrypt(TodoInput);
+        todoContext.Add(todoItem);
+        await todoContext.SaveChangesAsync();
+        TodoInput = string.Empty;
+        await LoadTodoList();
     }
 }

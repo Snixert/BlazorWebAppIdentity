@@ -1,1 +1,1 @@
-This file was created on a Unix system in a specific folder.
+This file was created on a Win32NT system in a specific folder.

@@ -1,9 +1,12 @@
+using BlazorApp1.Codes;
 using BlazorApp1.Components;
 using BlazorApp1.Components.Account;
 using BlazorApp1.Data;
+using BlazorApp1.Models;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +29,10 @@ builder.Services.AddAuthentication(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 options.UseSqlServer(connectionString));
+
+var todoListConnection = builder.Configuration.GetConnectionString("TodoListConnection") ?? throw new InvalidOperationException("Connection string 'TodoListConnection' not found.");
+builder.Services.AddDbContext<TodoContext>(options =>
+options.UseSqlServer(todoListConnection));
 //options.UseSqlite(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -36,6 +43,8 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
     .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<HashingExamples>();
+builder.Services.AddSingleton<EncryptionHandler>();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -61,6 +70,15 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.Password.RequiredLength = 6;
     options.Password.RequiredUniqueChars = 1;
 });
+
+builder.WebHost.UseKestrel((context, serverOptions) =>
+    {
+        serverOptions.Configure(context.Configuration.GetSection("Kestrel")).
+        Endpoint("HTTPS", listenOptions =>
+        {
+            listenOptions.HttpsOptions.SslProtocols = SslProtocols.Tls12;
+        });
+    });
 
 var app = builder.Build();
 
