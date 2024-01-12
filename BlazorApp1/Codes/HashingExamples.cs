@@ -105,6 +105,8 @@ namespace BlazorApp1.Codes
             return sb.ToString();
         }
 
+        
+
         /// <summary>
         /// Requires the Microsoft.AspNetCore.Cryptography.KeyDerivation package.
         /// </summary>
@@ -113,7 +115,8 @@ namespace BlazorApp1.Codes
         public static string PBKDF2Hashing(string textToHash, string salt)
         {
             byte[] inputBytes = Encoding.ASCII.GetBytes(textToHash);
-            byte[] saltAsbytes = Encoding.ASCII.GetBytes(salt);
+            //byte[] saltAsbytes = Encoding.ASCII.GetBytes(salt);
+            byte[] saltAsbytes = GenerateSalt();
             var hashAlgorithm = new System.Security.Cryptography.HashAlgorithmName("SHA256");
 
             var hashedTextAsBytes = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(inputBytes, saltAsbytes, 3, hashAlgorithm, 32);
@@ -121,6 +124,18 @@ namespace BlazorApp1.Codes
             string hashed = Convert.ToBase64String(hashedTextAsBytes);
 
             return hashed;
+        }
+
+        //Salt generator
+        private static byte[] GenerateSalt()
+        {
+            // Generate a random salt using a secure random number generator
+            byte[] salt = new byte[16];
+            using (var rng = new System.Security.Cryptography.RNGCryptoServiceProvider())
+            {
+                rng.GetBytes(salt);
+            }
+            return salt;
         }
 
         /// <summary>
